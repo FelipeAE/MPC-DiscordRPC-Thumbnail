@@ -6,6 +6,8 @@ const log = require('fancy-log'),
         replaceUnderscore, 
         showRemainingTime,  
         replaceDots,
+        title,
+        image,
     } = require('./config'),
     { JSDOM } = jsdom;
 
@@ -53,7 +55,7 @@ const states = {
  * @param {AxiosResponse} res Response from MPC Web Interface variables page
  * @param {RPCClient} rpc Discord Client RPC connection instance
  */
-const updatePresence = (res, rpc) => {
+const updatePresence = (res, rpc, force = false) => {
     // Identifies which MPC fork is running.
     const mpcFork = res.headers.server.replace(' WebServer', '');
 
@@ -91,8 +93,9 @@ const updatePresence = (res, rpc) => {
         startTimestamp: undefined,
         endTimestamp: undefined,
         details: playback.filename,
-        largeImageKey: mpcFork === 'MPC-BE' ? 'mpcbe_logo' : 'default',
-        largeImageText: mpcFork,
+        largeImageKey: image ?? (mpcFork === 'MPC-BE' ? 'mpcbe_logo' : 'default'),
+        largeImageText: title ?? mpcFork,
+        type: 3,
         smallImageKey: states[playback.state].stateKey,
         smallImageText: states[playback.state].string
     };
@@ -120,8 +123,8 @@ const updatePresence = (res, rpc) => {
     if ((playback.state !== playback.prevState) || (
         playback.state === '2' &&
         convert(playback.position) !== convert(playback.prevPosition) + 5000
-    )) {
-        rpc.setActivity(payload)
+    ) || force) {
+        rpc.user?.setActivity(payload)
             .catch((err) => {
                 log.error('ERROR: ' + err);
             });

@@ -10,7 +10,7 @@ exports.ignoreBrackets = true
 
 // Whether to omit filetype.
 // Default: false
-exports.ignoreFiletype = false
+exports.ignoreFiletype = true
 
 // Whether to replace _ with space.
 // Default: true
@@ -26,3 +26,7 @@ exports.replaceDots = true
 // the elapsed time.
 // Default: false
 exports.showRemainingTime = false
+
+exports.title = 'Anime'
+
+exports.image = 'main'
