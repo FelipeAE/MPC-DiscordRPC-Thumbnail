@@ -27,6 +27,7 @@ let playback = {
     state: '',
     prevState: '',
     prevPosition: '',
+    snapshot: '',
 };
 
 // Defines strings and image keys according to the 'state' string
@@ -93,7 +94,7 @@ const updatePresence = (res, rpc, force = false) => {
         startTimestamp: undefined,
         endTimestamp: undefined,
         details: playback.filename,
-        largeImageKey: image ?? (mpcFork === 'MPC-BE' ? 'mpcbe_logo' : 'default'),
+        largeImageKey: res.snapshot ?? image ?? (mpcFork === 'MPC-BE' ? 'mpcbe_logo' : 'default'),
         largeImageText: title ?? mpcFork,
         type: 3,
         smallImageKey: states[playback.state].stateKey,
@@ -123,7 +124,7 @@ const updatePresence = (res, rpc, force = false) => {
     if ((playback.state !== playback.prevState) || (
         playback.state === '2' &&
         convert(playback.position) !== convert(playback.prevPosition) + 5000
-    ) || force) {
+    ) || force || res.snapshot !== playback.snapshot ) {
         rpc.user?.setActivity(payload)
             .catch((err) => {
                 log.error('ERROR: ' + err);
@@ -136,6 +137,7 @@ const updatePresence = (res, rpc, force = false) => {
     // Replaces previous playback state and position for later comparison.
     playback.prevState = playback.state;
     playback.prevPosition = playback.position;
+    playback.snapshot = res.snapshot;
     return true;
 };
 
