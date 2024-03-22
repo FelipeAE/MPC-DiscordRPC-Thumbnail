@@ -75,7 +75,7 @@ const updatePresence = (res, rpc, force = false) => {
 	// Removes brackets and its content from filename if `ignoreBrackets` option
 	// is set to true
     if (ignoreBrackets) {
-        playback.filename = playback.filename.replace(/ *\[[^\]]*\]/g, "").trimStr(128);
+        playback.filename = playback.filename.replace(/ *\[[^\]]*\]/g, "").replace(/ *\([^\)]*\)/g, "").trimStr(128);
         if (playback.filename.substr(0, playback.filename.lastIndexOf(".")).length == 0) playback.filename = filename;
     }
 	

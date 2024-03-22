@@ -1,0 +1,22 @@
+{
+	"$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+	"appId": "com.electron.mpc-discord",
+	"asar": true,
+	"directories": {
+		"output": "release/${version}"
+	},
+	"win": {
+		"target": [
+			{
+				"target": "nsis",
+				"arch": ["x64", "ia32"]
+			}
+		],
+		"artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+	},
+	"nsis": {
+		"oneClick": true,
+		"deleteAppDataOnUninstall": true,
+		"createDesktopShortcut": false
+	}
+}

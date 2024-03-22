@@ -1,14 +1,15 @@
 {
   "name": "MPC-DiscordRPC",
   "version": "0.5.0",
-  "main": "index.js",
+  "main": "main.js",
   "repository": "https://github.com/angeloanan/MPC-DiscordRPC.git",
   "bugs": "https://github.com/angeloanan/MPC-DiscordRPC/issues",
   "author": "angeloanan <anandavid2002@gmail.com>",
   "contributors": [
     "Der-Eddy (https://www.eddy-dev.net)",
     "Lucas Miranda <liddack@outlook.com>",
-    "MaciejGorczyca (https://github.com/MaciejGorczyca)"
+    "MaciejGorczyca (https://github.com/MaciejGorczyca)",
+    "aqemi (https://github.com/aqemi)"
   ],
   "os": [
     "win32"
@@ -17,7 +18,11 @@
     "node": ">=8.3.0"
   },
   "scripts": {
-    "dev": "nodemon --signal SIGINT",
+    "build": "electron-builder build",
+    "pack": "electron-builder build --dir",
+    "dev:builder": "electron-builder start",
+    "dev": "nodemon --signal SIGINT --exec electron .",
+    "dev:node": "nodemon --signal SIGINT",
     "start": "del /F /Q mpc-discordrpc.log && pm2 start pm2.config.js",
     "stop": "pm2 delete mpc-discordrpc"
   },
@@ -33,6 +38,7 @@
     "sharp": "^0.32.6"
   },
   "devDependencies": {
+    "electron": "^26.2.4",
     "nodemon": "^3.0.1"
   }
 }
