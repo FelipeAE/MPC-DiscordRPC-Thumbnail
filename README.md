@@ -1,5 +1,7 @@
-# MPC-DiscordRPC
-Discord Rich Presence for Media Player Classic (Home Cinema and Black Edition)
+# MPC-DiscordRPC-Thumbnail
+Discord Rich Presence for Media Player Classic (Home Cinema and Black Edition) with Enhanced Thumbnail Support
+
+> **Note:** This is an enhanced fork of the original [MPC-DiscordRPC](https://github.com/angeloanan/MPC-DiscordRPC) project with improved thumbnail functionality and better Imgur integration.
 
 ![Media Player Classic Home Cinema and Black Edition Rich Presence on Discord small profile](https://i.imgur.com/QAAJZgL.png)
 
@@ -9,16 +11,28 @@ This program simply fetches playback data from MPC-HC / MPC-BE Web Interface, an
 Please note that this only works with [Discord desktop client](https://discordapp.com/download), not with the web app.
 
 ## How to install
-1. Open your Media Player Classic, go to `View > Options > Player > Web Interface` and enable `Listen on port:` option. The default port is `13579`, but if you have changed it, please edit the `config.js` file after you download the project.
+1. Open your Media Player Classic, go to `View > Options > Player > Web Interface` and enable the following options:
+   - Enable `Listen on port:` option (default port is `13579`)
+   - Enable `Allow access from localhost only`
+   - Enable `Serve pages from:` and set it to `/webroot`
+   - Set the default page to `index.html,index.php`
 
 ![Enable the option "Listen on port"](https://cdn.discordapp.com/attachments/416273308540207116/428748994307424256/unknown.png)
 
+**Important for thumbnail functionality:** Also configure these additional settings:
+   - Enable `Enable compression`
+   - Enable `Enable preview` option  
+   - Enable `Show debugging information`
+   - In the CGI handlers field, add: `ext1=url1;ext2=url2;`
+
+These settings are necessary for the snapshot/thumbnail feature to work correctly with Discord Rich Presence.
+
 2. Install [`Node.JS`](https://nodejs.org/en/download/current/) (we recommend using the latest version).
 
-3. [Download this project as a .zip file](https://github.com/angeloanan/MPC-DiscordRPC/archive/master.zip), extract it and open a terminal window in the project directory. Otherwise, if you have [Git](https://git-scm.com/) installed, run:
+3. [Download this project as a .zip file](https://github.com/aqemi/MPC-DiscordRPC-Electron/archive/master.zip), extract it and open a terminal window in the project directory. Otherwise, if you have [Git](https://git-scm.com/) installed, run:
 
 ```sh
-git clone https://github.com/angeloanan/MPC-DiscordRPC.git && cd MPC-DiscordRPC
+git clone https://github.com/aqemi/MPC-DiscordRPC-Electron.git && cd MPC-DiscordRPC-Electron
 ```
 
 4. Install dependencies using: 
@@ -58,7 +72,7 @@ npm stop
 npm stop
 ```
 
-3. Update this project by [redownloading this project as a .zip file](https://github.com/angeloanan/MPC-DiscordRPC/archive/master.zip) and replacing the old files. 
+3. Update this project by [redownloading this project as a .zip file](https://github.com/aqemi/MPC-DiscordRPC-Electron/archive/master.zip) and replacing the old files. 
 
    Otherwise, if you have Git installed, run:
    ```sh
@@ -103,3 +117,17 @@ Whether to replace dot (`.`) characters (except the file extension one) with spa
 Default: `false`
 
 Whether to display the current file's remaining playback time while playing, instead of showing the elapsed time.
+
+#### `exports.imgurClientId`
+Default: `'b1499242386d1ad'`
+
+Imgur Client-ID for uploading anonymous images. This is used for the thumbnail/snapshot feature that displays video screenshots in Discord Rich Presence. The default value should work for most users, but you can create your own Imgur application and use your own Client-ID if needed.
+
+## Thumbnail Feature
+
+This fork includes an enhanced thumbnail feature that automatically captures screenshots from your currently playing video and displays them in Discord Rich Presence. The thumbnails are uploaded to Imgur and refreshed every 2 minutes.
+
+### Requirements for Thumbnails
+- Make sure all the MPC-HC Web Interface settings mentioned in the installation section are properly configured
+- The snapshot feature requires MPC-HC to have the "Enable preview" option enabled
+- Thumbnails are automatically resized to 512x512 pixels for optimal Discord display

@@ -2,6 +2,8 @@ const log = require('fancy-log');
 
 log.info('INFO: Loading...');
 
+
+
 [`SIGINT`, `SIGUSR1`, `SIGUSR2`, `SIGTERM`].forEach(eventType => {
 	process.on(eventType, shutdown);
 });
@@ -13,6 +15,8 @@ const axios = require('axios').default,
 	events = require('events'),
 	sharp = require('sharp'),
 	config = require('./config'),
+	imgur = require('imgur'),
+	
 	// clientId = '427863248734388224';
 	clientId = '1108520115466678332';
 
@@ -31,6 +35,7 @@ if (isNaN(config.port)) {
 
 const uri = `http://127.0.0.1:${config.port}/variables.html`;
 
+log.info(`Using Imgur Client-ID: ${config.imgurClientId}`);
 log.info('INFO: Fully ready. Trying to connect to Discord client...');
 
 // When it succesfully connects to MPC Web Interface, it begins checking MPC
@@ -106,37 +111,64 @@ function checkMPCEndpoint() {
 }
 
 
+
+
 async function uploadSnapshot() {
-	log.info(`INFO: Uploading snapshot`);
-	try {
-		const { data: image } = await axios.get(`http://127.0.0.1:${config.port}/snapshot.jpg`, {
-			validateStatus: status => status === 200,
-			responseType: 'arraybuffer',
-		});
+  log.info('INFO: Uploading snapshot to Imgur…');
+  try {
+    // 1. Descargamos el snapshot original
+    const { data: image } = await axios.get(
+      `http://127.0.0.1:${config.port}/snapshot.jpg`, {
+        responseType: 'arraybuffer',
+        validateStatus: status => status === 200
+      }
+    );
 
-		const thumbnail = await sharp(image).resize({ width: 512, height: 512, fit: 'cover', withoutEnlargement: true }).jpeg().toBuffer();
-		log.info(`Thumbnail size ${Buffer.byteLength(thumbnail) / 1024} kB`);
+    // 2. Generamos la miniatura con Sharp
+    const thumbnail = await sharp(image)
+      .resize({ width: 512, height: 512, fit: 'cover', withoutEnlargement: true })
+      .jpeg()
+      .toBuffer();
+    log.info(`Thumbnail size ${(thumbnail.length / 1024).toFixed(1)} kB`);
 
-		const form = new FormData();
-		form.append('source', thumbnail, 'snapshot.jpg');
+    // 3. Preparamos el FormData para Imgur
+    const form = new FormData();
+    // — ojo: aquí usamos la variable thumbnail que ya existe
+    form.append('image', thumbnail, {
+      filename: 'snapshot.jpg',
+      contentType: 'image/jpeg'
+    });
 
-		const { data: response } = await axios.post('https://imgcdn.dev/api/1/upload/', form, {
-			validateStatus: status => status === 200,
-			params: {
-				key: '5386e05a3562c7a8f984e73401540836',
-			},
-			data: form,
-			headers: {
-				...form.getHeaders(),
-			},
-		});
+    // 4. Subimos a Imgur
+    const res = await axios.post('https://api.imgur.com/3/image', form, {
+      headers: {
+        Authorization: `Client-ID ${config.imgurClientId}`,
+        ...form.getHeaders()
+      },
+      validateStatus: status => status === 200
+    });
 
-		snapshot = response.image.url;
-		log.info(`INFO: Uploaded snapshot successfully ${snapshot}`);
-	} catch (err) {
-		log.error('ERROR: Error on transferring snapshot', err.message);
-	}
+    // 5. Guardamos la URL devuelta
+    snapshot = res.data.data.link;
+    log.info(`INFO: Uploaded snapshot successfully to Imgur: ${snapshot}`);
+
+  } catch (err) {
+    // Dump completo del error para facilitar debugging
+    if (err.response) {
+      log.error(
+        `IMGUR ERROR ${err.response.status}:`,
+        JSON.stringify(err.response.data, null, 2)
+      );
+    } else {
+      log.error('ERROR uploading to Imgur:', err.message);
+    }
+  }
 }
+
+
+    
+
+
 
 // Initiates a new RPC connection to Discord client.
 function initRPC(clientId) {
