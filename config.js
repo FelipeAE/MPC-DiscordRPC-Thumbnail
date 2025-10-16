@@ -31,11 +31,6 @@ exports.title = 'Anime'
 
 exports.image = 'main'
 
-// Tu ImgCDN API key (guest/public)
-exports.apiKey = '5386e05a3562c7a8f984e73401540836';
-
-// Imgur API (Client-ID) para subir imágenes anónimas
-exports.imgurClientId = 'b1499242386d1ad';
-
-//exports.imgurClientSecret = 'a402d929f5ac863097d89c0e71e00e3e943e41c6';
+// Imgur Client ID for thumbnail uploads
+exports.imgurClientId = '546c25a59c58ad7'
 
