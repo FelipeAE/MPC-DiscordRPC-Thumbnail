@@ -15,10 +15,7 @@ const axios = require('axios').default,
 	events = require('events'),
 	sharp = require('sharp'),
 	config = require('./config'),
-	http = require('http'),
-	fs = require('fs'),
-	path = require('path'),
-	ngrok = require('ngrok'),
+	imgur = require('imgur'),
 	
 	// clientId = '427863248734388224';
 	clientId = '1108520115466678332';
@@ -29,8 +26,7 @@ let mediaEmitter = new events.EventEmitter(),
 	mpcServerLoop,
 	snapshotLoop,
 	snapshot,
-	rpc,
-	ngrokUrl;
+	rpc;
 
 // Checks if port set in config.js is valid.
 if (isNaN(config.port)) {
@@ -39,63 +35,7 @@ if (isNaN(config.port)) {
 
 const uri = `http://127.0.0.1:${config.port}/variables.html`;
 
-// Crear servidor HTTP local para servir las imágenes
-const localServer = http.createServer(async (req, res) => {
-  // Validación básica: rechazar peticiones muy largas
-  if (!req.url || req.url.length > 500) {
-    res.writeHead(400, { 'Content-Type': 'text/plain' });
-    res.end('Invalid request');
-    return;
-  }
-
-  try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-
-    if (url.pathname === '/thumbnail.jpg') {
-      const thumbnailPath = path.join(__dirname, 'thumbnail.jpg');
-      try {
-        const fileBuffer = await fs.promises.readFile(thumbnailPath);
-
-        res.writeHead(200, {
-          'Content-Type': 'image/jpeg',
-          'Content-Length': fileBuffer.length,
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        });
-        res.end(fileBuffer);
-      } catch (err) {
-        if (err.code === 'ENOENT') {
-          res.writeHead(404, { 'Content-Type': 'text/plain' });
-          res.end('Thumbnail not found');
-        } else {
-          res.writeHead(500, { 'Content-Type': 'text/plain' });
-          res.end('Error reading thumbnail');
-        }
-      }
-    } else {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not found');
-    }
-  } catch (err) {
-    // Validación de URL inválida
-    res.writeHead(400, { 'Content-Type': 'text/plain' });
-    res.end('Invalid request');
-  }
-});
-
-// Iniciar servidor local y ngrok
-localServer.listen(8080, '127.0.0.1', async () => {
-  log.info('Local image server started on http://127.0.0.1:8080');
-  try {
-    ngrokUrl = await ngrok.connect(8080);
-    log.info(`Ngrok tunnel created: ${ngrokUrl}`);
-  } catch (err) {
-    log.error('Failed to create ngrok tunnel:', err.message);
-  }
-});
-
+log.info(`Using Imgur Client-ID: ${config.imgurClientId}`);
 log.info('INFO: Fully ready. Trying to connect to Discord client...');
 
 // When it succesfully connects to MPC Web Interface, it begins checking MPC
@@ -104,12 +44,11 @@ log.info('INFO: Fully ready. Trying to connect to Discord client...');
 mediaEmitter.on('CONNECTED', res => {
 	clearInterval(mpcServerLoop);
 	mpcServerLoop = setInterval(checkMPCEndpoint, 5000);
-	
-	// Procesar snapshots siempre (Imgur primero, ngrok como fallback)
-	clearInterval(snapshotLoop);
-	uploadSnapshot();
-	snapshotLoop = setInterval(uploadSnapshot, 120_000);
-	
+	if (snapshotLoop?._onTimeout !== uploadSnapshot) {
+		uploadSnapshot();
+		clearInterval(snapshotLoop);
+		snapshotLoop = setInterval(uploadSnapshot, 120_000);
+	}
 	let forceUpdate = false;
 	if (!active) {
 		log.info(`INFO: Connected to ${res.headers.server}`);
@@ -135,7 +74,7 @@ mediaEmitter.on('CONN_ERROR', code => {
 		// process.exit(0);
 	}
 	clearInterval(snapshotLoop);
-	if (!mpcServerLoop || mpcServerLoop._onTimeout !== checkMPCEndpoint) {
+	if (mpcServerLoop._onTimeout !== checkMPCEndpoint) {
 		clearInterval(mpcServerLoop);
 		mpcServerLoop = setInterval(checkMPCEndpoint, 15000);
 	}
@@ -175,7 +114,7 @@ function checkMPCEndpoint() {
 
 
 async function uploadSnapshot() {
-  log.info('INFO: Processing snapshot locally...');
+  log.info('INFO: Uploading snapshot to Imgur…');
   try {
     // 1. Descargamos el snapshot original
     const { data: image } = await axios.get(
@@ -192,54 +131,37 @@ async function uploadSnapshot() {
       .toBuffer();
     log.info(`Thumbnail size ${(thumbnail.length / 1024).toFixed(1)} kB`);
 
-    // 3. Guardamos la imagen localmente
-    const thumbnailPath = path.join(__dirname, 'thumbnail.jpg');
-    fs.writeFileSync(thumbnailPath, thumbnail);
+    // 3. Preparamos el FormData para Imgur
+    const form = new FormData();
+    // — ojo: aquí usamos la variable thumbnail que ya existe
+    form.append('image', thumbnail, {
+      filename: 'snapshot.jpg',
+      contentType: 'image/jpeg'
+    });
 
-    const oldSnapshot = snapshot;
+    // 4. Subimos a Imgur
+    const res = await axios.post('https://api.imgur.com/3/image', form, {
+      headers: {
+        Authorization: `Client-ID ${config.imgurClientId}`,
+        ...form.getHeaders()
+      },
+      validateStatus: status => status === 200
+    });
 
-    // 4. Intentar subir a Imgur como servicio principal
-    try {
-      const form = new FormData();
-      form.append('image', thumbnail.toString('base64'));
-      
-      const imgurResponse = await axios.post('https://api.imgur.com/3/image', form, {
-        headers: {
-          ...form.getHeaders(),
-          'Authorization': 'Client-ID 546c25a59c58ad7',
-        },
-        timeout: 10000, // 10 seconds timeout
-      });
-
-      if (imgurResponse.data && imgurResponse.data.data && imgurResponse.data.data.link) {
-        snapshot = imgurResponse.data.data.link;
-        log.info(`INFO: Snapshot uploaded to Imgur: ${snapshot}`);
-      } else {
-        throw new Error('Invalid Imgur response');
-      }
-    } catch (imgurError) {
-      log.warn('WARN: Imgur upload failed, trying ngrok fallback:', imgurError.message);
-      
-      // Fallback a ngrok si Imgur falla
-      if (ngrokUrl) {
-        const timestamp = Date.now();
-        snapshot = `${ngrokUrl}/thumbnail.jpg?t=${timestamp}`;
-        log.info(`INFO: Using ngrok fallback: ${snapshot}`);
-      } else {
-        log.error('ERROR: Both Imgur and ngrok unavailable, using placeholder');
-        snapshot = 'https://via.placeholder.com/512x512.jpg?text=Thumbnail+Error';
-      }
-    }
-
-    // 5. Forzar actualización del Rich Presence si cambió la imagen
-    if (oldSnapshot !== snapshot && rpc && active) {
-      log.info('INFO: Forcing Rich Presence update with new thumbnail');
-      // Forzar una actualización inmediata
-      checkMPCEndpoint();
-    }
+    // 5. Guardamos la URL devuelta
+    snapshot = res.data.data.link;
+    log.info(`INFO: Uploaded snapshot successfully to Imgur: ${snapshot}`);
 
   } catch (err) {
-    log.error('ERROR processing snapshot locally:', err.message);
+    // Dump completo del error para facilitar debugging
+    if (err.response) {
+      log.error(
+        `IMGUR ERROR ${err.response.status}:`,
+        JSON.stringify(err.response.data, null, 2)
+      );
+    } else {
+      log.error('ERROR uploading to Imgur:', err.message);
+    }
   }
 }
 
@@ -284,16 +206,13 @@ async function destroyRPC() {
 
 // Boots the whole script, attempting to connect
 // to Discord client every 10 seconds.
-discordRPCLoop = setInterval(() => initRPC(clientId), 10000);
 initRPC(clientId);
+discordRPCLoop = setInterval(initRPC, 10000, clientId);
 
 async function shutdown() {
 	log.info('Shutting down...');
 	try {
 		await destroyRPC();
-		localServer.close();
-		await ngrok.kill();
-		log.info('Local server and ngrok tunnel closed');
 	} catch (err) {
 		log.error('Error on shutdown', err);
 	} finally {
