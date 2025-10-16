@@ -12,11 +12,17 @@ const log = require('fancy-log'),
     { JSDOM } = jsdom;
 
 // Discord Rich Presence has a string length limit of 128 characters.
-// This little plugin (based on https://stackoverflow.com/a/43006978/7090367)
-// helps by trimming strings up to a given length.
-String.prototype.trimStr = function (length) {
-    return this.length > length ? this.substring(0, length - 3) + "..." : this;
+// This utility function trims strings up to a given length.
+// Based on https://stackoverflow.com/a/43006978/7090367
+const trimStr = (str, length) => {
+    return str.length > length ? str.substring(0, length - 3) + "..." : str;
 };
+
+// Precompiled regular expressions for performance
+const BRACKETS_REGEX = / *\[[^\]]*\]/g;
+const PARENTHESES_REGEX = / *\([^\)]*\)/g;
+const DOTS_REGEX = /[.](?=.*[.])/g;
+const UNDERSCORE_REGEX = /_/g;
 
 // Defines playback data fetched from MPC.
 let playback = {
@@ -64,25 +70,25 @@ const updatePresence = (res, rpc, force = false) => {
     const { document } = new JSDOM(res.data).window;
 
     // Gets relevant info from the DOM object.
-    let filename = playback.filename = document.getElementById('filepath').textContent.split("\\").pop().trimStr(128);
+    let filename = playback.filename = trimStr(document.getElementById('filepath').textContent.split("\\").pop(), 128);
     playback.state = document.getElementById('state').textContent;
     playback.duration = sanitizeTime(document.getElementById('durationstring').textContent);
     playback.position = sanitizeTime(document.getElementById('positionstring').textContent);
 
     // Replaces underscore characters to space characters
-    if (replaceUnderscore) playback.filename = playback.filename.replace(/_/g, " ");
+    if (replaceUnderscore) playback.filename = playback.filename.replace(UNDERSCORE_REGEX, " ");
 
 	// Removes brackets and its content from filename if `ignoreBrackets` option
 	// is set to true
     if (ignoreBrackets) {
-        playback.filename = playback.filename.replace(/ *\[[^\]]*\]/g, "").replace(/ *\([^\)]*\)/g, "").trimStr(128);
+        playback.filename = trimStr(playback.filename.replace(BRACKETS_REGEX, "").replace(PARENTHESES_REGEX, ""), 128);
         if (playback.filename.substr(0, playback.filename.lastIndexOf(".")).length == 0) playback.filename = filename;
     }
 	
     // Replaces dots in filenames to space characters
     // Solution found at https://stackoverflow.com/a/28673744
     if (replaceDots) {
-        playback.filename = playback.filename.replace(/[.](?=.*[.])/g, " ");
+        playback.filename = playback.filename.replace(DOTS_REGEX, " ");
     }
 
 	// Removes filetype from displaying
@@ -147,24 +153,21 @@ const updatePresence = (res, rpc, force = false) => {
  * @returns {number} Number of milliseconds converted from the given time string
  */
 const convert = time => {
-    let parts = time.split(':'),
-        seconds = parseInt(parts[parts.length - 1]),
-        minutes = parseInt(parts[parts.length - 2]),
-        hours = (parts.length > 2) ? parseInt(parts[0]) : 0;
-    return ((hours * 60 * 60) + (minutes * 60) + seconds) * 1000;
+    const parts = time.split(':');
+    const seconds = parseInt(parts[parts.length - 1], 10);
+    const minutes = parseInt(parts[parts.length - 2], 10);
+    const hours = parts.length > 2 ? parseInt(parts[0], 10) : 0;
+    return ((hours * 3600) + (minutes * 60) + seconds) * 1000;
 };
 
 /**
- * In case the given 'hh:mm:ss' formatted time string is less than 1 hour, 
+ * In case the given 'hh:mm:ss' formatted time string is less than 1 hour,
  * removes the '00' hours from it.
  * @param {string} time Time string formatted as 'hh:mm:ss'
  * @returns {string} Time string without '00' hours
  */
 const sanitizeTime = time => {
-    if (time.split(':')[0] === '00') {
-        return time.substr(3, time.length - 1);
-    }
-    return time;
+    return time.startsWith('00:') ? time.substring(3) : time;
 };
 
 module.exports = updatePresence;
